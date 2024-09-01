@@ -1,18 +1,21 @@
 FROM ubuntu:noble AS base
 
-# ARG fnm_installation_directory="/fnm"
-ARG node_version=20.17.0
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+ARG fnm_install_dir="/opt/fnm"
+ARG node_version="v20.17.0"
 
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
     ca-certificates curl unzip && \
-    # Adding `fnm`
-    curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "./fnm" && \
-    cp ./fnm/fnm /usr/bin && \
-    # Installing Node.js
-    fnm install "$node_version" && \
-    corepack enable && \
-    # Cleaning up
+    curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "${fnm_install_dir}" && \
+    ln -s ${fnm_install_dir}/fnm /usr/bin && chmod +x /usr/bin/fnm && \
+    fnm install ${node_version} && \
+    fnm default ${node_version} --corepack-enabled && \
+    node --version && \
+    npm --version && \
+    pnpm --version && \
     rm -rf /var/lib/apt/lists/*
 
 COPY . /app
@@ -21,15 +24,9 @@ WORKDIR /app
 
 FROM base AS prod-deps
 
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
 
 FROM base AS build
-
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile && \
     pnpm run build
