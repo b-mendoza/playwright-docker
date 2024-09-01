@@ -1,26 +1,19 @@
 FROM ubuntu:noble AS base
 
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-
-ARG fnm_install_dir="/opt/fnm"
-ARG node_version="v20.17.0"
-
-RUN apt-get update -y && \
-    apt-get install -y --no-install-recommends \
-    ca-certificates curl unzip && \
-    curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "${fnm_install_dir}" && \
-    ln -s ${fnm_install_dir}/fnm /usr/bin && chmod +x /usr/bin/fnm && \
-    fnm install ${node_version} && \
-    fnm default ${node_version} --corepack-enabled && \
-    node --version && \
-    npm --version && \
-    pnpm --version && \
-    rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
 COPY . /app
 
-WORKDIR /app
+RUN apt-get update -y && \
+    apt-get install --no-install-recommends -y \
+    ca-certificates curl unzip && \
+    curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-dir "/opt/fnm" && \
+    ln -s /opt/fnm/fnm /usr/local/bin/fnm && \
+    fnm install v20.17.0 && \
+    fnm default v20.17.0 && \
+    eval "$(fnm env --use-on-cd)" && \
+    corepack enable && \
+    corepack prepare pnpm@latest --activate
 
 FROM base AS prod-deps
 
@@ -30,7 +23,6 @@ FROM base AS build
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile && \
     pnpm run build
-
 
 FROM base
 
